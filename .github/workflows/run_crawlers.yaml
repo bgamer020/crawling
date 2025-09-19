@@ -30,3 +30,11 @@ jobs:
 
     - name: Run crawl_trending.py
       run: python crawl_trending.py
+      
+    - name: Upload CSV
+      uses: actions/upload-artifact@v4
+      with:
+        name: crawl-results
+        path: |
+          youtube_trending.csv
+          youtube_non_trending.csv
