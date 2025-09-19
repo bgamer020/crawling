@@ -1,51 +1,94 @@
-name: Run Crawlers on Schedule
+import pandas as pd
+from googleapiclient.discovery import build
+from datetime import datetime
+import os
 
-on:
-  schedule:
-    - cron: '0 17 * * *'  # 0h VN
-    - cron: '0 23 * * *'  # 6h VN
-    - cron: '0 5 * * *'   # 12h VN
-    - cron: '0 11 * * *'  # 18h VN
-    - cron: '0 15 * * *'  # 22h VN
-  workflow_dispatch:      # cho phép chạy thủ công
+API_KEY = os.getenv("YOUTUBE_API_KEY")  # ⚠️ Nên để trong biến môi trường
+youtube = build("youtube", "v3", developerKey=API_KEY)
 
-permissions:
-  contents: write   # ✅ cho phép commit file CSV
+# Lấy danh sách categoryId -> categoryName
+def get_video_categories(region="VN"):
+    request = youtube.videoCategories().list(part="snippet", regionCode=region)
+    response = request.execute()
+    return {item["id"]: item["snippet"]["title"] for item in response["items"]}
 
-jobs:
-  run-crawlers:
-    runs-on: ubuntu-latest
-    env:
-      YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+# Lấy danh sách video trending
+def get_trending_videos(total_results=100, region="VN"):
+    categories = get_video_categories(region)
+    videos, fetched = [], 0
+    max_per_request = 50  # API limit
+    today = datetime.today().strftime("%Y-%m-%d")
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0   # ✅ để pull đầy đủ lịch sử (cần cho append)
+    while fetched < total_results:
+        to_fetch = min(max_per_request, total_results - fetched)
+        request = youtube.videos().list(
+            part="snippet,statistics",
+            chart="mostPopular",
+            regionCode=region,
+            maxResults=to_fetch
+        )
+        response = request.execute()
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
+        for idx, item in enumerate(response.get("items", []), start=fetched+1):
+            cat_id = item["snippet"].get("categoryId", "N/A")
+            stats = item.get("statistics", {})
+            publish_date = item["snippet"]["publishedAt"][:10]  # YYYY-MM-DD
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pandas google-api-python-client
+            videos.append({
+                "videoId": item["id"],
+                "title": item["snippet"]["title"],
+                "channelTitle": item["snippet"]["channelTitle"],
+                "category": categories.get(cat_id, "Unknown"),
+                "publishDate": publish_date,       # ngày đăng video
+                "collectDate": today,              # ngày thu thập
+                "region": region,                  # khu vực
+                "rank": idx,                       # tạm rank theo lượt lấy
+                "viewCount": stats.get("viewCount", 0),
+                "likeCount": stats.get("likeCount", 0),
+                "commentCount": stats.get("commentCount", 0),
+            })
+        fetched += len(response.get("items", []))
+        if len(response.get("items", [])) < to_fetch:
+            break
+    return videos
 
-    - name: Run non-trending crawler
-      run: python crawl_non_trending.py
+# 📌 Crawl cho nhiều region
+regions = ["VN", "US", "KR"]
+all_videos = []
 
-    - name: Run trending crawler
-      run: python crawl_trending.py
+for region in regions:
+    print(f"📥 Đang crawl {region} ...")
+    videos = get_trending_videos(50, region)
+    all_videos.extend(videos)
 
-    - name: Commit & Push CSV results
-      uses: EndBug/add-and-commit@v9
-      with:
-        author_name: github-actions
-        author_email: actions@github.com
-        message: "Update CSV data [skip ci]"
-        add: |
-          youtube_trending.csv
-          youtube_non_trending.csv
+df_new = pd.DataFrame(all_videos)
+
+# 📌 File CSV chung
+# 📌 File CSV chung
+file_name = "youtube_trending.csv"
+
+if os.path.exists(file_name):
+    df_old = pd.read_csv(file_name, encoding="utf-8-sig")
+
+    # Bỏ các bản ghi đã tồn tại (videoId + collectDate + region)
+    merge_keys = ["videoId", "collectDate", "region"]
+    df_new = df_new[~df_new.set_index(merge_keys).index.isin(df_old.set_index(merge_keys).index)]
+
+    # Gộp dữ liệu mới + cũ
+    df_final = pd.concat([df_old, df_new], ignore_index=True)
+else:
+    df_final = df_new
+
+# Reset rank cho từng collectDate + region
+df_final["rank"] = (
+    df_final.groupby(["collectDate", "region"])
+    .cumcount() + 1
+)
+
+# Ghi file
+df_final.to_csv(file_name, index=False, encoding="utf-8-sig")
+
+print(f"✅ Đã thêm {len(df_new)} video trending ({', '.join(regions)}), file hiện có {len(df_final)} bản ghi.")
+
+
+
