@@ -6,7 +6,7 @@ import os
 # 🔑 API KEY (nên để trong biến môi trường)
 
 API_KEY = "YOUR_API_KEY"
-youtube = build("youtube", "v3", developerKey=API\_KEY)
+youtube = build("youtube", "v3", developerKey=API_KEY)
 
 # 📌 Lấy video trending (để loại bỏ khỏi non-trending)
 
@@ -18,7 +18,7 @@ regionCode=region,
 maxResults=max_results
 )
 response = request.execute()
-return {item\["id"] for item in response.get("items", \[])}
+return {item["id"] for item in response.get("items", [])}
 
 # 📌 Lấy video theo category (không phải trending)
 
@@ -47,7 +47,7 @@ return videos
 
 # 📌 Lấy statistics cho video
 
-def get_video_statistics(video\_ids):
+def get_video_statistics(video_ids):
 stats_list = []
 for i in range(0, len(video_ids), 50):  # mỗi lần gọi tối đa 50 id
 request = youtube.videos().list(
@@ -129,4 +129,5 @@ print(f"✅ Đã lưu {len(df_new)} video non-trending, file hiện có {len(df_
 
 if **name** == "**main**":
 main()
+
 
