@@ -112,8 +112,7 @@ def main():
         # Gộp dữ liệu
         df_final = pd.concat([df_old, df_new], ignore_index=True)
 
-        # Loại bỏ trùng videoId (ưu tiên bản mới nhất)
-        df_final = df_final.drop_duplicates(subset=["videoId"], keep="last")
+       
     else:
         df_final = df_new
 
@@ -123,3 +122,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
