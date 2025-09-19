@@ -5,65 +5,65 @@ import os
 
 # 🔑 API KEY (nên để trong biến môi trường)
 
-API\_KEY = "YOUR\_API\_KEY"
+API_KEY = "YOUR_API_KEY"
 youtube = build("youtube", "v3", developerKey=API\_KEY)
 
 # 📌 Lấy video trending (để loại bỏ khỏi non-trending)
 
-def get\_trending\_video\_ids(region="VN", max\_results=50):
+def get_trending_video_ids(region="VN", max_results=50):
 request = youtube.videos().list(
 part="id",
 chart="mostPopular",
 regionCode=region,
-maxResults=max\_results
+maxResults=max_results
 )
 response = request.execute()
 return {item\["id"] for item in response.get("items", \[])}
 
 # 📌 Lấy video theo category (không phải trending)
 
-def get\_videos\_by\_category(category\_id, region="VN", max\_results=50):
+def get_videos_by_category(category_id, region="VN", max_results=50):
 request = youtube.search().list(
 part="snippet",
 type="video",
 regionCode=region,
-videoCategoryId=category\_id,
-maxResults=max\_results,
+videoCategoryId=category_id,
+maxResults=max_results,
 order="viewCount"
 )
 response = request.execute()
-videos = \[]
-for item in response.get("items", \[]):
-video\_id = item\["id"]\["videoId"]
-snippet = item\["snippet"]
+videos = []
+for item in response.get("items", []):
+video_id = item["id"]["videoId"]
+snippet = item["snippet"]
 videos.append({
-"videoId": video\_id,
-"title": snippet\["title"],
-"channelTitle": snippet\["channelTitle"],
-"categoryId": category\_id,
-"publishDate": snippet\["publishedAt"]\[:10]  # YYYY-MM-DD
+"videoId": video_id,
+"title": snippet["title"],
+"channelTitle": snippet["channelTitle"],
+"categoryId": category_id,
+"publishDate": snippet["publishedAt"][:10]  # YYYY-MM-DD
 })
 return videos
 
 # 📌 Lấy statistics cho video
 
-def get\_video\_statistics(video\_ids):
-stats\_list = \[]
-for i in range(0, len(video\_ids), 50):  # mỗi lần gọi tối đa 50 id
+def get_video_statistics(video\_ids):
+stats_list = []
+for i in range(0, len(video_ids), 50):  # mỗi lần gọi tối đa 50 id
 request = youtube.videos().list(
 part="statistics",
-id=",".join(video\_ids\[i\:i+50])
+id=",".join(video_ids[i:i+50])
 )
 response = request.execute()
-for item in response.get("items", \[]):
+for item in response.get("items", []):
 stats = item.get("statistics", {})
-stats\_list.append({
-"videoId": item\["id"],
+stats_list.append({
+"videoId": item["id"],
 "viewCount": int(stats.get("viewCount", 0)),
 "likeCount": int(stats.get("likeCount", 0)),
 "commentCount": int(stats.get("commentCount", 0)),
 })
-return pd.DataFrame(stats\_list)
+return pd.DataFrame(stats_list)
 
 def main():
 categories = {
@@ -129,3 +129,4 @@ print(f"✅ Đã lưu {len(df_new)} video non-trending, file hiện có {len(df_
 
 if **name** == "**main**":
 main()
+
