@@ -4,7 +4,8 @@ from datetime import datetime
 import time
 from googleapiclient.discovery import build
 
-API_KEY = 'AIzaSyAbFvg3b2QKli5LywMHtuqyQuex4HHuq3s'  # Thay API key của bạn
+
+API_KEY = os.getenv("YOUTUBE_API_KEY")
 REGION = 'VN'
 COLLECT_DATE = datetime.now().strftime('%Y-%m-%d')
 FILE_NAME = 'youtube_non_trending.csv'
@@ -209,3 +210,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
