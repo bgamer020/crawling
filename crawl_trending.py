@@ -64,17 +64,12 @@ for region in regions:
 df_new = pd.DataFrame(all_videos)
 
 # 📌 File CSV chung
-# 📌 File CSV chung
 file_name = "youtube_trending.csv"
 
 if os.path.exists(file_name):
     df_old = pd.read_csv(file_name, encoding="utf-8-sig")
 
-    # Bỏ các bản ghi đã tồn tại (videoId + collectDate + region)
-    merge_keys = ["videoId", "collectDate", "region"]
-    df_new = df_new[~df_new.set_index(merge_keys).index.isin(df_old.set_index(merge_keys).index)]
-
-    # Gộp dữ liệu mới + cũ
+    # Gộp dữ liệu mới + cũ (KHÔNG bỏ trùng)
     df_final = pd.concat([df_old, df_new], ignore_index=True)
 else:
     df_final = df_new
@@ -88,7 +83,10 @@ df_final["rank"] = (
 # Ghi file
 df_final.to_csv(file_name, index=False, encoding="utf-8-sig")
 
-print(f"✅ Đã thêm {len(df_new)} video trending ({', '.join(regions)}), file hiện có {len(df_final)} bản ghi.")
+print(f"✅ Đã thêm {len(df_new)} video trending ({', '.join(regions)}), "
+      f"file hiện có {len(df_final)} bản ghi.")
+
+
 
 
 
