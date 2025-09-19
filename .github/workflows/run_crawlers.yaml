@@ -1,9 +1,9 @@
 name: Run Crawlers
 
 on:
-  workflow_dispatch:   # Cho phép chạy tay trong tab Actions
+  workflow_dispatch:   # Cho phép chạy thủ công
   schedule:
-    - cron: "0 0 * * *"   # Hoặc hẹn giờ (tuỳ chọn)
+    - cron: "0 0,6,12,18 * * *"   # chạy 0h, 6h, 12h, 18h UTC mỗi ngày
 
 jobs:
   run:
@@ -28,3 +28,15 @@ jobs:
         run: |
           python crawl_trending.py
           python crawl_non_trending.py
+
+      - name: Set timestamp
+        id: vars
+        run: echo "ts=$(date +'%Y-%m-%d_%H-%M')" >> $GITHUB_OUTPUT
+
+      - name: Upload CSV results
+        uses: actions/upload-artifact@v3
+        with:
+          name: youtube-data-${{ steps.vars.outputs.ts }}
+          path: |
+            youtube_trending.csv
+            youtube_non_trending.csv
