@@ -29,14 +29,10 @@ jobs:
           python crawl_trending.py
           python crawl_non_trending.py
 
-      - name: Set timestamp
-        id: vars
-        run: echo "ts=$(date +'%Y-%m-%d_%H-%M')" >> $GITHUB_OUTPUT
-
-      - name: Upload CSV results
-        uses: actions/upload-artifact@v4
-        with:
-          name: youtube-data-${{ steps.vars.outputs.ts }}
-          path: |
-            youtube_trending.csv
-            youtube_non_trending.csv
+      - name: Commit CSV results
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add youtube_trending.csv youtube_non_trending.csv
+          git commit -m "Update CSV results on $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
+          git push
