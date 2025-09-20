@@ -34,7 +34,7 @@ jobs:
         run: echo "ts=$(date +'%Y-%m-%d_%H-%M')" >> $GITHUB_OUTPUT
 
       - name: Upload CSV results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: youtube-data-${{ steps.vars.outputs.ts }}
           path: |
