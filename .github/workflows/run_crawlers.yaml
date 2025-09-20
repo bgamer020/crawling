@@ -9,12 +9,15 @@ jobs:
   run:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write   # Cho phép push vào repo
+
     env:
       YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -35,4 +38,17 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add youtube_trending.csv youtube_non_trending.csv
           git commit -m "Update CSV results on $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
-          git push
+          git push origin HEAD:${{ github.ref }}
+
+      - name: Set timestamp
+        id: vars
+        run: echo "ts=$(date +'%Y-%m-%d_%H-%M')" >> $GITHUB_OUTPUT
+
+      - name: Upload CSV results
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-data-${{ steps.vars.outputs.ts }}
+          path: |
+            youtube_trending.csv
+            youtube_non_trending.csv
+          retention-days: 7   # giữ artifact 7 ngày
