@@ -3,7 +3,7 @@ from googleapiclient.discovery import build
 from datetime import datetime
 import os
 
-API_KEY = "AIzaSyB4YKQzICN1gidYXyFpbWlvBPEypvwTqMY"# hoặc gán trực tiếp
+API_KEY = os.getenv("YOUTUBE_API_KEY")
 youtube = build("youtube", "v3", developerKey=API_KEY)
 crawl_date = datetime.now().strftime("%Y-%m-%d")  # Ngày crawl
 crawl_time = datetime.now().strftime("%H:%M:%S")  # Giờ crawl       
@@ -104,3 +104,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
