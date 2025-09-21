@@ -3,7 +3,7 @@ from googleapiclient.discovery import build
 from datetime import datetime
 import os
 
-API_KEY = "AIzaSyB4YKQzICN1gidYXyFpbWlvBPEypvwTqMY"# hoặc gán trực tiếp
+API_KEY = os.getenv("YOUTUBE_API_KEY")
 youtube = build("youtube", "v3", developerKey=API_KEY)
 today = datetime.today().strftime("%Y-%m-%d")
 region = "VN"
@@ -57,7 +57,7 @@ def get_video_statistics(video_ids):
     return pd.DataFrame(stats)
 
 def main():
-    file_name = "youtube_keyword_tracker.csv"
+    file_name = "youtube_non_trending.csv"
     keywords = ["nhạc", "game", "vlog"]
     max_per_keyword = 50  # ~50 video tổng
 
@@ -100,3 +100,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
