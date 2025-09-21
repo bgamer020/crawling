@@ -3,9 +3,10 @@ from googleapiclient.discovery import build
 from datetime import datetime
 import os
 
-API_KEY = os.getenv("YOUTUBE_API_KEY")
+API_KEY = "AIzaSyB4YKQzICN1gidYXyFpbWlvBPEypvwTqMY"# hoặc gán trực tiếp
 youtube = build("youtube", "v3", developerKey=API_KEY)
-today = datetime.today().strftime("%Y-%m-%d")
+crawl_date = datetime.now().strftime("%Y-%m-%d")  # Ngày crawl
+crawl_time = datetime.now().strftime("%H:%M:%S")  # Giờ crawl       
 region = "VN"
 
 def get_trending_video_ids(region="VN", max_results=50):
@@ -33,9 +34,11 @@ def get_videos_by_keyword(keyword, max_results=16):
             "channelTitle": snippet["channelTitle"],
             "keyword": keyword,
             "publishDate": snippet["publishedAt"][:10],
-            "collectDate": today,
+            "collectDate": crawl_date,      # 🆕 Ngày crawl
+            "collectTime": crawl_time,      # 🆕 Giờ crawl
             "region": region
         })
+
     return videos
 
 def get_video_statistics(video_ids):
@@ -52,12 +55,13 @@ def get_video_statistics(video_ids):
                 "viewCount": int(s.get("viewCount", 0)),
                 "likeCount": int(s.get("likeCount", 0)),
                 "commentCount": int(s.get("commentCount", 0)),
-                "updateDate": today
+                      # ✅ dùng collectDate luôn
             })
     return pd.DataFrame(stats)
 
+
 def main():
-    file_name = "youtube_non_trending.csv"
+    file_name = "youtube_keyword_tracker.csv"
     keywords = ["nhạc", "game", "vlog"]
     max_per_keyword = 50  # ~50 video tổng
 
@@ -100,4 +104,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
