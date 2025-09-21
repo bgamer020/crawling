@@ -3,7 +3,7 @@ from googleapiclient.discovery import build
 from datetime import datetime
 import os
 
-API_KEY = os.getenv("YOUTUBE_API_KEY")# hoặc gán trực tiếp
+API_KEY = "AIzaSyB4YKQzICN1gidYXyFpbWlvBPEypvwTqMY"# hoặc gán trực tiếp
 youtube = build("youtube", "v3", developerKey=API_KEY)
 today = datetime.today().strftime("%Y-%m-%d")
 region = "VN"
@@ -19,8 +19,9 @@ def get_trending_video_ids(region="VN", max_results=50):
 def get_videos_by_keyword(keyword, max_results=16):
     req = youtube.search().list(
         part="snippet", q=keyword, type="video",
-        regionCode=region, maxResults=max_results,
-        order="viewCount"
+        regionCode="VN", maxResults=max_results,
+        order="viewCount",
+        relevanceLanguage="vi"
     )
     res = req.execute()
     videos = []
@@ -39,7 +40,26 @@ def get_videos_by_keyword(keyword, max_results=16):
 
 def get_video_statistics(video_ids):
     stats = []
-    for i in range(0, len(100  # ~50 video tổng
+    for i in range(0, len(video_ids), 50):
+        req = youtube.videos().list(
+            part="statistics", id=",".join(video_ids[i:i+50])
+        )
+        res = req.execute()
+        for item in res.get("items", []):
+            s = item.get("statistics", {})
+            stats.append({
+                "videoId": item["id"],
+                "viewCount": int(s.get("viewCount", 0)),
+                "likeCount": int(s.get("likeCount", 0)),
+                "commentCount": int(s.get("commentCount", 0)),
+                "updateDate": today
+            })
+    return pd.DataFrame(stats)
+
+def main():
+    file_name = "youtube_keyword_tracker.csv"
+    keywords = ["nhạc", "game", "vlog"]
+    max_per_keyword = 50  # ~50 video tổng
 
     if not os.path.exists(file_name):
         # 🔥 Lần đầu: crawl video + lưu thống kê ban đầu
@@ -80,4 +100,3 @@ def get_video_statistics(video_ids):
 
 if __name__ == "__main__":
     main()
-
