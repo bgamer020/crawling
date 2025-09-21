@@ -3,7 +3,7 @@ from googleapiclient.discovery import build
 from datetime import datetime
 import os
 
-API_KEY = os.getenv(API_KEY)
+API_KEY = os.getenv("YOUTUBE_API_KEY")
 youtube = build("youtube", "v3", developerKey=API_KEY)
 
 # Lấy danh sách categoryId -> categoryName
@@ -91,3 +91,4 @@ df_final.to_csv(file_name, index=False, encoding="utf-8-sig", columns=columns_or
 
 print(f"✅ Đã thêm {len(df_new)} video trending ({', '.join(regions)}), "
       f"file hiện có {len(df_final)} bản ghi.")
+
