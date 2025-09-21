@@ -1,94 +1,92 @@
-import pandas as pd
 from googleapiclient.discovery import build
-from datetime import datetime
-import os
+import pandas as pd
+import datetime, os, isodate
 
 API_KEY = os.getenv("YOUTUBE_API_KEY")
 youtube = build("youtube", "v3", developerKey=API_KEY)
 
-# Lấy danh sách categoryId -> categoryName
-def get_video_categories(region="VN"):
-    request = youtube.videoCategories().list(part="snippet", regionCode=region)
-    response = request.execute()
-    return {item["id"]: item["snippet"]["title"] for item in response["items"]}
+def get_trending_videos(region="VN", max_results=50):
+    videos = []
+    next_page_token = None
+    category_map = {
+        "1": "Film & Animation","2": "Autos & Vehicles","10": "Music",
+        "15": "Pets & Animals","17": "Sports","19": "Travel & Events",
+        "20": "Gaming","22": "People & Blogs","23": "Comedy",
+        "24": "Entertainment","25": "News & Politics","26": "Howto & Style",
+        "27": "Education","28": "Science & Technology","29": "Nonprofits & Activism"
+    }
 
-# Lấy danh sách video trending
-def get_trending_videos(total_results=100, region="VN"):
-    categories = get_video_categories(region)
-    videos, fetched = [], 0
-    max_per_request = 50  # API limit
-    today = datetime.now().strftime("%Y-%m-%d")      # 🆕 Ngày crawl
-    now_time = datetime.now().strftime("%H:%M:%S")   # 🆕 Giờ crawl
-
-    while fetched < total_results:
-        to_fetch = min(max_per_request, total_results - fetched)
-        request = youtube.videos().list(
-            part="snippet,statistics",
+    while True:
+        req = youtube.videos().list(
+            part="snippet,statistics,contentDetails",
             chart="mostPopular",
             regionCode=region,
-            maxResults=to_fetch
+            maxResults=50,
+            pageToken=next_page_token
         )
-        response = request.execute()
+        resp = req.execute()
 
-        for idx, item in enumerate(response.get("items", []), start=fetched+1):
-            cat_id = item["snippet"].get("categoryId", "N/A")
-            stats = item.get("statistics", {})
-            publish_date = item["snippet"]["publishedAt"][:10]  # YYYY-MM-DD
+        for idx, item in enumerate(resp["items"], start=1):
+            snippet = item["snippet"]
+            stats   = item["statistics"]
+            details = item["contentDetails"]
+
+            duration_iso = details.get("duration","")
+            td = isodate.parse_duration(duration_iso)
+            duration_seconds = int(td.total_seconds())
+
+            cat_id = snippet.get("categoryId","")
+            category_name = category_map.get(str(cat_id), "")
+
+            publish_date_full = snippet["publishedAt"]
+            publish_date = publish_date_full.split("T")[0]
+            publish_time = publish_date_full.split("T")[1].replace("Z","")
+
+            now = datetime.datetime.now()
+            collect_date = now.strftime("%Y-%m-%d")
+            collect_time = now.strftime("%H:%M:%S")
 
             videos.append({
                 "videoId": item["id"],
-                "title": item["snippet"]["title"],
-                "channelTitle": item["snippet"]["channelTitle"],
-                "category": categories.get(cat_id, "Unknown"),
-                "publishDate": publish_date,       # ngày đăng video
-                "collectDate": today,              # ngày thu thập
-                "collectTime": now_time,           # 🆕 giờ thu thập
-                "region": region,                  # khu vực
-                "rank": idx,                       # tạm rank theo lượt lấy
+                "title": snippet["title"],
+                "channelId": snippet["channelId"],
+                "channelTitle": snippet["channelTitle"],
+                "category": category_name,
+                "publishDate": publish_date,
+                "publishTime": publish_time,
+                "collectDate": collect_date,
+                "collectTime": collect_time,
+                "region": region,
+                "rank": idx,
                 "viewCount": stats.get("viewCount", 0),
                 "likeCount": stats.get("likeCount", 0),
                 "commentCount": stats.get("commentCount", 0),
+                "duration": duration_seconds
             })
-        fetched += len(response.get("items", []))
-        if len(response.get("items", [])) < to_fetch:
+
+        next_page_token = resp.get("nextPageToken")
+        if not next_page_token or len(videos) >= max_results:
             break
-    return videos
 
-# 📌 Crawl cho nhiều region
-regions = ["VN", "US", "KR"]
-all_videos = []
+    return pd.DataFrame(videos)
 
-for region in regions:
-    print(f"📥 Đang crawl {region} ...")
-    videos = get_trending_videos(50, region)
-    all_videos.extend(videos)
+# ---------- Crawl 50 video trending VN, KR, US ----------
+regions = ["VN","KR","US"]
+dfs = []
+for r in regions:
+    print(f"⏳ Đang crawl 50 video trending {r} ...")
+    dfs.append(get_trending_videos(region=r, max_results=50))
 
-df_new = pd.DataFrame(all_videos)
+df_all = pd.concat(dfs, ignore_index=True)
 
-# 📌 File CSV chung
-file_name = "youtube_trending.csv"
+# ---------- Append vào CSV ----------
+out_file = "youtube_trending.csv"
 
-if os.path.exists(file_name):
-    df_old = pd.read_csv(file_name, encoding="utf-8-sig")
-    # Gộp dữ liệu mới + cũ (KHÔNG bỏ trùng)
-    df_final = pd.concat([df_old, df_new], ignore_index=True)
+if os.path.exists(out_file):
+    # File đã có: ghi nối tiếp, không ghi header
+    df_all.to_csv(out_file, mode="a", header=False, index=False, encoding="utf-8-sig")
 else:
-    df_final = df_new
+    # File chưa có: ghi mới kèm header
+    df_all.to_csv(out_file, mode="w", header=True, index=False, encoding="utf-8-sig")
 
-# Reset rank cho từng collectDate + region
-df_final["rank"] = (
-    df_final.groupby(["collectDate", "region"])
-    .cumcount() + 1
-)
-
-# Ghi file
-columns_order = [
-    "videoId","title","channelTitle","category",
-    "publishDate","collectDate","collectTime",
-    "region","rank","viewCount","likeCount","commentCount"
-]
-df_final.to_csv(file_name, index=False, encoding="utf-8-sig", columns=columns_order)
-
-print(f"✅ Đã thêm {len(df_new)} video trending ({', '.join(regions)}), "
-      f"file hiện có {len(df_final)} bản ghi.")
 
