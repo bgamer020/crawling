@@ -3,123 +3,99 @@ from googleapiclient.discovery import build
 from datetime import datetime
 import os
 
-# 🔑 API KEY (nên để trong biến môi trường)
-API_KEY = os.getenv("YOUTUBE_API_KEY")
+API_KEY = os.getenv("YOUTUBE_API_KEY")# hoặc gán trực tiếp
 youtube = build("youtube", "v3", developerKey=API_KEY)
+today = datetime.today().strftime("%Y-%m-%d")
+region = "VN"
 
-# 📌 Lấy video trending (để loại bỏ khỏi non-trending)
 def get_trending_video_ids(region="VN", max_results=50):
-    request = youtube.videos().list(
-        part="id",
-        chart="mostPopular",
-        regionCode=region,
-        maxResults=max_results
+    req = youtube.videos().list(
+        part="id", chart="mostPopular",
+        regionCode=region, maxResults=max_results
     )
-    response = request.execute()
-    return {item["id"] for item in response.get("items", [])}
+    res = req.execute()
+    return {item["id"] for item in res.get("items", [])}
 
-# 📌 Lấy video theo category (không phải trending)
-def get_videos_by_category(category_id, region="VN", max_results=50):
-    request = youtube.search().list(
-        part="snippet",
-        type="video",
-        regionCode=region,
-        videoCategoryId=category_id,
-        maxResults=max_results,
+def get_videos_by_keyword(keyword, max_results=16):
+    req = youtube.search().list(
+        part="snippet", q=keyword, type="video",
+        regionCode=region, maxResults=max_results,
         order="viewCount"
     )
-    response = request.execute()
+    res = req.execute()
     videos = []
-    for item in response.get("items", []):
-        video_id = item["id"]["videoId"]
+    for item in res.get("items", []):
         snippet = item["snippet"]
         videos.append({
-            "videoId": video_id,
+            "videoId": item["id"]["videoId"],
             "title": snippet["title"],
             "channelTitle": snippet["channelTitle"],
-            "categoryId": category_id,
-            "publishDate": snippet["publishedAt"][:10]  # YYYY-MM-DD
+            "keyword": keyword,
+            "publishDate": snippet["publishedAt"][:10],
+            "collectDate": today,
+            "region": region
         })
     return videos
 
-# 📌 Lấy statistics cho video
 def get_video_statistics(video_ids):
-    stats_list = []
-    for i in range(0, len(video_ids), 50):  # mỗi lần gọi tối đa 50 id
-        request = youtube.videos().list(
-            part="statistics",
-            id=",".join(video_ids[i:i+50])
+    stats = []
+    for i in range(0, len(video_ids), 50):
+        req = youtube.videos().list(
+            part="statistics", id=",".join(video_ids[i:i+50])
         )
-        response = request.execute()
-        for item in response.get("items", []):
-            stats = item.get("statistics", {})
-            stats_list.append({
+        res = req.execute()
+        for item in res.get("items", []):
+            s = item.get("statistics", {})
+            stats.append({
                 "videoId": item["id"],
-                "viewCount": int(stats.get("viewCount", 0)),
-                "likeCount": int(stats.get("likeCount", 0)),
-                "commentCount": int(stats.get("commentCount", 0)),
+                "viewCount": int(s.get("viewCount", 0)),
+                "likeCount": int(s.get("likeCount", 0)),
+                "commentCount": int(s.get("commentCount", 0)),
+                "updateDate": today
             })
-    return pd.DataFrame(stats_list)
+    return pd.DataFrame(stats)
 
 def main():
-    categories = {
-        "Music": "10",
-        "Gaming": "20",
-        "Entertainment": "24",
-        "People & Blogs": "22"
-    }
-
-    region = "VN"
-    today = datetime.today().strftime("%Y-%m-%d")
-
-    # 📌 Lấy danh sách trending để loại bỏ
-    trending_ids = get_trending_video_ids(region, 50)
-
-    all_videos = []
-    for name, cat_id in categories.items():
-        print(f"📥 Crawl {name} ...")
-        videos = get_videos_by_category(cat_id, region, 50)
-
-        # Bỏ video trending
-        videos = [v for v in videos if v["videoId"] not in trending_ids]
-
-        # Thêm metadata
-        for v in videos:
-            v["collectDate"] = today
-            v["region"] = region
-            v["categoryName"] = name
-
-        all_videos.extend(videos)
-
-    if not all_videos:
-        print("⚠️ Không lấy được video nào.")
-        return
-
-    # 📌 DataFrame
-    df_new = pd.DataFrame(all_videos)
-
-    # Thêm statistics
-    stats_df = get_video_statistics(df_new["videoId"].tolist())
-    df_new = df_new.merge(stats_df, on="videoId", how="left")
-
-    # 📌 File lưu
     file_name = "youtube_non_trending.csv"
+    keywords = ["nhạc", "game", "vlog"]
+    max_per_keyword = 16  # ~50 video tổng
 
-    if os.path.exists(file_name):
-        print("📂 Có dữ liệu cũ, gộp thêm dữ liệu mới...")
-        df_old = pd.read_csv(file_name, encoding="utf-8-sig")
+    if not os.path.exists(file_name):
+        # 🔥 Lần đầu: crawl video + lưu thống kê ban đầu
+        print("📥 Lần đầu crawl dữ liệu ...")
+        trending_ids = get_trending_video_ids(region, 50)
+        all_videos = []
+        for kw in keywords:
+            print(f"➡️ Crawl từ khóa: {kw}")
+            vids = get_videos_by_keyword(kw, max_per_keyword)
+            vids = [v for v in vids if v["videoId"] not in trending_ids]
+            all_videos.extend(vids)
 
-        # Gộp dữ liệu
-        df_final = pd.concat([df_old, df_new], ignore_index=True)
+        base_df = pd.DataFrame(all_videos)
+        stats_df = get_video_statistics(base_df["videoId"].tolist())
+        df = base_df.merge(stats_df, on="videoId", how="left")
+        df.to_csv(file_name, index=False, encoding="utf-8-sig")
+        print(f"✅ Đã lưu {len(df)} video non-trending (lần đầu).")
 
-       
     else:
-        df_final = df_new
+        # 🔄 Lần sau: append số liệu mới
+        print("🔄 Đang cập nhật và append lịch sử ...")
+        old_df = pd.read_csv(file_name, encoding="utf-8-sig")
 
-    # Xuất CSV
-    df_final.to_csv(file_name, index=False, encoding="utf-8-sig")
-    print(f"✅ Đã lưu {len(df_new)} video non-trending, file hiện có {len(df_final)} bản ghi.")
+        # Lấy danh sách video cũ để update
+        unique_videos = old_df.drop_duplicates("videoId")
+        stats_df = get_video_statistics(unique_videos["videoId"].tolist())
+
+        # Merge thông tin cố định (title, channel...) vào stats mới
+        merged = stats_df.merge(
+            unique_videos[["videoId","title","channelTitle","keyword","publishDate","collectDate","region"]],
+            on="videoId",
+            how="left"
+        )
+
+        # Ghi nối tiếp (append) vào file CSV
+        merged.to_csv(file_name, mode="a", header=False, index=False, encoding="utf-8-sig")
+        print(f"✅ Đã append {len(merged)} dòng thống kê mới vào file.")
 
 if __name__ == "__main__":
     main()
-
