@@ -3,7 +3,7 @@ from googleapiclient.discovery import build
 from datetime import datetime
 import os
 
-API_KEY = os.getenv("YOUTUBE_API_KEY")
+API_KEY = os.getenv(API_KEY)
 youtube = build("youtube", "v3", developerKey=API_KEY)
 
 # Lấy danh sách categoryId -> categoryName
@@ -17,7 +17,8 @@ def get_trending_videos(total_results=100, region="VN"):
     categories = get_video_categories(region)
     videos, fetched = [], 0
     max_per_request = 50  # API limit
-    today = datetime.today().strftime("%Y-%m-%d")
+    today = datetime.now().strftime("%Y-%m-%d")      # 🆕 Ngày crawl
+    now_time = datetime.now().strftime("%H:%M:%S")   # 🆕 Giờ crawl
 
     while fetched < total_results:
         to_fetch = min(max_per_request, total_results - fetched)
@@ -41,6 +42,7 @@ def get_trending_videos(total_results=100, region="VN"):
                 "category": categories.get(cat_id, "Unknown"),
                 "publishDate": publish_date,       # ngày đăng video
                 "collectDate": today,              # ngày thu thập
+                "collectTime": now_time,           # 🆕 giờ thu thập
                 "region": region,                  # khu vực
                 "rank": idx,                       # tạm rank theo lượt lấy
                 "viewCount": stats.get("viewCount", 0),
@@ -68,7 +70,6 @@ file_name = "youtube_trending.csv"
 
 if os.path.exists(file_name):
     df_old = pd.read_csv(file_name, encoding="utf-8-sig")
-
     # Gộp dữ liệu mới + cũ (KHÔNG bỏ trùng)
     df_final = pd.concat([df_old, df_new], ignore_index=True)
 else:
@@ -81,12 +82,12 @@ df_final["rank"] = (
 )
 
 # Ghi file
-df_final.to_csv(file_name, index=False, encoding="utf-8-sig")
+columns_order = [
+    "videoId","title","channelTitle","category",
+    "publishDate","collectDate","collectTime",
+    "region","rank","viewCount","likeCount","commentCount"
+]
+df_final.to_csv(file_name, index=False, encoding="utf-8-sig", columns=columns_order)
 
 print(f"✅ Đã thêm {len(df_new)} video trending ({', '.join(regions)}), "
       f"file hiện có {len(df_final)} bản ghi.")
-
-
-
-
-
