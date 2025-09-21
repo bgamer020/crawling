@@ -39,26 +39,7 @@ def get_videos_by_keyword(keyword, max_results=16):
 
 def get_video_statistics(video_ids):
     stats = []
-    for i in range(0, len(video_ids), 50):
-        req = youtube.videos().list(
-            part="statistics", id=",".join(video_ids[i:i+50])
-        )
-        res = req.execute()
-        for item in res.get("items", []):
-            s = item.get("statistics", {})
-            stats.append({
-                "videoId": item["id"],
-                "viewCount": int(s.get("viewCount", 0)),
-                "likeCount": int(s.get("likeCount", 0)),
-                "commentCount": int(s.get("commentCount", 0)),
-                "updateDate": today
-            })
-    return pd.DataFrame(stats)
-
-def main():
-    file_name = "youtube_non_trending.csv"
-    keywords = ["nhạc", "game", "vlog"]
-    max_per_keyword = 16  # ~50 video tổng
+    for i in range(0, len(100  # ~50 video tổng
 
     if not os.path.exists(file_name):
         # 🔥 Lần đầu: crawl video + lưu thống kê ban đầu
@@ -99,3 +80,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
