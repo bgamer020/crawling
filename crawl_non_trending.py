@@ -61,7 +61,7 @@ def get_video_statistics(video_ids):
 
 
 def main():
-    file_name = "youtube_keyword_tracker.csv"
+    file_name = "youtube_non_trending.csv"
     keywords = ["nhạc", "game", "vlog"]
     max_per_keyword = 50  # ~50 video tổng
 
@@ -104,4 +104,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
