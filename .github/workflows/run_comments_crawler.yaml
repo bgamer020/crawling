@@ -1,0 +1,49 @@
+name: Comment Crawler
+
+on:
+  schedule:
+    - cron: "0 18 * * *"   # chạy lúc 1h sáng giờ VN (UTC+7)
+  workflow_dispatch:        # có thể chạy thủ công từ GitHub
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install pandas google-api-python-client
+
+      - name: Run crawler
+        run: |
+          python crawl_comments.py
+
+      # === Upload artifacts (có thể tải về từ Actions UI) ===
+      - name: Upload comments.csv
+        uses: actions/upload-artifact@v3
+        with:
+          name: comments
+          path: comments.csv
+
+      - name: Upload crawled_videos.csv
+        uses: actions/upload-artifact@v3
+        with:
+          name: crawled_videos
+          path: crawled_videos.csv
+
+      # === Commit & Push kết quả lên repo ===
+      - name: Commit and Push results
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add comments.csv crawled_videos.csv
+          git commit -m "Update crawled data [skip ci]" || echo "No changes to commit"
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }} HEAD:main
