@@ -3,7 +3,7 @@ name: Comment Crawler
 on:
   schedule:
     - cron: "0 18 * * *"   # chạy lúc 1h sáng giờ VN (UTC+7)
-  workflow_dispatch:        # có thể chạy thủ công từ GitHub
+  workflow_dispatch:
 
 jobs:
   crawl:
@@ -11,10 +11,10 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4   # cũng nên nâng lên v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
@@ -26,20 +26,20 @@ jobs:
         run: |
           python crawl_comments.py
 
-      # === Upload artifacts (có thể tải về từ Actions UI) ===
+      # === Upload artifacts (v4 mới) ===
       - name: Upload comments.csv
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: comments
           path: comments.csv
 
       - name: Upload crawled_videos.csv
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: crawled_videos
           path: crawled_videos.csv
 
-      # === Commit & Push kết quả lên repo ===
+      # === Commit & Push file mới vào repo ===
       - name: Commit and Push results
         run: |
           git config --global user.name "github-actions[bot]"
