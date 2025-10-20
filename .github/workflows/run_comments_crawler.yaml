@@ -3,7 +3,7 @@ name: Crawl Trending Comments
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 0,6,12,18 * * *"   # Chạy mỗi ngày 4 lần: 00h, 06h, 12h, 18h UTC
+    - cron: "0 0,6,12,18 * * *"   # chạy 4 lần/ngày
 
 jobs:
   crawl:
@@ -23,13 +23,12 @@ jobs:
         pip install pandas google-api-python-client
 
     - name: ✅ Tạo thư mục lưu file theo ngày (VD: crawled/2025-10-20)
-      id: setfolder
       run: |
         TODAY=$(date +'%Y-%m-%d')
         echo "FOLDER=crawled/$TODAY" >> $GITHUB_ENV
-        mkdir -p "crawled/$TODAY"
+        mkdir -p crawled/$TODAY
 
-    - name: ✅ Chạy file crawl và lưu kết quả
+    - name: ✅ Chạy file crawl (API key đã nằm trong code Python rồi)
       env:
         SAVE_PATH: ${{ env.FOLDER }}/comments.csv
       run: |
@@ -38,6 +37,5 @@ jobs:
     - name: ✅ Upload artifact để tải về
       uses: actions/upload-artifact@v4
       with:
-        # Artifact không được có dấu "/" trong tên, nên thay bằng dấu gạch dưới "_"
-        name: comments_${{ env.FOLDER//\//_ }}
+        name: comments_${{ env.FOLDER }}
         path: ${{ env.FOLDER }}
