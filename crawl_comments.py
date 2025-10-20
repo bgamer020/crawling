@@ -1,156 +1,81 @@
-import os
-import pandas as pd
 from googleapiclient.discovery import build
+import pandas as pd
+from tqdm import tqdm
+import time
 
-# ==== Cấu hình ====
+# 🔑 Thay bằng API key của bạn
 API_KEY = "AIzaSyB1AJ862OVBHBDIZSASiEgCHzHo1_ramiE"
-INPUT_FILE = "youtube_trending.csv"    # file video trending (có cột region)
-OUTPUT_FILE = "comments.csv"           # nơi lưu comment
-CRAWLED_VIDEOS_FILE = "crawled_videos.csv"  # lưu danh sách video đã crawl
 
-# ==== Đọc danh sách video, chỉ lấy region = VN ====
-df = pd.read_csv(INPUT_FILE)
+# ⚙️ Khởi tạo service YouTube
+youtube = build('youtube', 'v3', developerKey=API_KEY)
 
-if "region" in df.columns:
-    df = df[df["region"] == "VN"]
+# 📌 Lấy danh sách 50 video trending VN
+def get_trending_videos(max_results=50, region='VN'):
+    request = youtube.videos().list(
+        part="snippet",
+        chart="mostPopular",
+        regionCode=region,
+        maxResults=max_results
+    )
+    response = request.execute()
+    videos = []
 
-if "videoId" in df.columns:
-    video_ids = df["videoId"].dropna().astype(str).unique().tolist()
-elif "url" in df.columns:
-    df["videoId"] = df["url"].str.extract(r"v=([\w-]{11})")
-    video_ids = df["videoId"].dropna().astype(str).unique().tolist()
-else:
-    raise ValueError("Không tìm thấy cột videoId hoặc url trong file csv")
+    for item in response['items']:
+        videos.append({
+            "videoId": item["id"],
+            "title": item["snippet"]["title"],
+            "category": item["snippet"]["categoryId"]
+        })
+    return videos
 
-print(f"📺 Tổng số video Việt Nam trong dữ liệu: {len(video_ids)}")
-
-# ==== Load danh sách video đã crawl ====
-if os.path.exists(CRAWLED_VIDEOS_FILE):
-    crawled_df = pd.read_csv(CRAWLED_VIDEOS_FILE)
-    crawled_videos = set(crawled_df["videoId"].astype(str))
-else:
-    crawled_videos = set()
-
-print(f"✅ Đã crawl {len(crawled_videos)} video trước đó")
-
-# ==== Build YouTube API ====
-youtube = build("youtube", "v3", developerKey=API_KEY)
-
-# ==== Lấy mapping categoryId -> categoryName ====
-def get_category_mapping(region="VN"):
-    cats = {}
-    req = youtube.videoCategories().list(part="snippet", regionCode=region)
-    res = req.execute()
-    for item in res["items"]:
-        cats[item["id"]] = item["snippet"]["title"]
-    return cats
-
-category_map = get_category_mapping()
-
-# ==== Hàm lấy title + category của nhiều video (batch 50 id) ====
-def get_video_infos(video_ids):
-    infos = {}
-    for i in range(0, len(video_ids), 50):
-        batch = video_ids[i:i+50]
-        try:
-            req = youtube.videos().list(part="snippet", id=",".join(batch))
-            res = req.execute()
-            for item in res.get("items", []):
-                vid = item["id"]
-                snippet = item["snippet"]
-                infos[vid] = {
-                    "title": snippet.get("title"),
-                    "category": category_map.get(snippet.get("categoryId"), "Unknown")
-                }
-        except Exception as e:
-            print(f"❌ Lỗi khi lấy info batch {batch}: {e}")
-    return infos
-
-# ==== Hàm crawl comment ====
-def get_comments(video_id, max_comments=100):
+# 📌 Lấy toàn bộ comments của 1 video
+def get_all_comments(video_id, title, category):
     comments = []
-    try:
-        req = youtube.commentThreads().list(
-            part="snippet",
-            videoId=video_id,
-            maxResults=100,
-            textFormat="plainText"
-        )
-        while req and len(comments) < max_comments:
-            res = req.execute()
-            for item in res.get("items", []):
-                top = item["snippet"]["topLevelComment"]["snippet"]
+    next_page_token = None
+
+    while True:
+        try:
+            request = youtube.commentThreads().list(
+                part="snippet",
+                videoId=video_id,
+                maxResults=100,
+                pageToken=next_page_token,
+                textFormat="plainText"
+            )
+            response = request.execute()
+
+            for item in response["items"]:
+                top_comment = item["snippet"]["topLevelComment"]["snippet"]
                 comments.append({
-                    "comment": top.get("textDisplay"),
-                    "commentLikes": top.get("likeCount", 0)
+                    "videoId": video_id,
+                    "title": title,
+                    "category": category,
+                    "comment": top_comment["textDisplay"],
+                    "commentLikes": top_comment["likeCount"]
                 })
-                if len(comments) >= max_comments:
-                    break
-            req = youtube.commentThreads().list_next(req, res)
-    except Exception as e:
-        if "quotaExceeded" in str(e):
-            print("❌ Hết quota, dừng crawl!")
-            return None
-        elif "commentsDisabled" in str(e):
-            print(f"🚫 Video {video_id} tắt comment.")
-            return []
-        else:
-            print(f"⚠️ Lỗi khi crawl comment video {video_id}: {e}")
-            return []
+
+            next_page_token = response.get("nextPageToken")
+            if not next_page_token:
+                break
+
+        except Exception as e:
+            print(f"⚠️ Video {video_id} bị lỗi hoặc tắt bình luận: {e}")
+            break
+
+        time.sleep(0.2)  # chống quota bị khóa
+
     return comments
 
-# ==== Crawl toàn bộ video ====
-all_data = []
-crawled_list = []
+# 🚀 Chạy crawl
+print("📥 Đang lấy danh sách 50 video trending tại Việt Nam...")
+videos = get_trending_videos()
 
-# Lấy thông tin tất cả video trước (title, category)
-video_infos = get_video_infos(video_ids)
+all_comments = []
+for video in tqdm(videos, desc="📄 Crawling comments"):
+    all_comments.extend(get_all_comments(video["videoId"], video["title"], video["category"]))
 
-for vid in video_ids:
-    if vid in crawled_videos:
-        print(f"➡️ Bỏ qua {vid} (đã crawl)")
-        continue
+# 💾 Lưu vào file comments.csv
+df = pd.DataFrame(all_comments)
+df.to_csv("comments.csv", index=False, encoding="utf-8-sig")
 
-    if vid not in video_infos:
-        print(f"⚠️ Không tìm thấy thông tin video {vid}")
-        continue
-
-    print(f"🚀 Crawl video {vid} ...")
-    title = video_infos[vid]["title"]
-    category = video_infos[vid]["category"]
-
-    comments = get_comments(vid, max_comments=100)
-    if comments is None:  # quota exceeded
-        break
-    if len(comments) == 0:
-        print(f"⚠️ Video {vid} không có comment")
-        continue
-
-    for c in comments:
-        all_data.append({
-            "videoId": vid,
-            "title": title,
-            "category": category,
-            "comment": c["comment"],
-            "commentLikes": c["commentLikes"]
-        })
-
-    crawled_list.append(vid)
-
-    # Lưu tạm comment (append thêm)
-    if all_data:
-        pd.DataFrame(all_data).to_csv(
-            OUTPUT_FILE,
-            mode="a",
-            header=not os.path.exists(OUTPUT_FILE),
-            index=False,
-            encoding="utf-8-sig"
-        )
-        all_data = []  # reset để không bị ghi trùng
-
-    # Lưu tạm danh sách video đã crawl
-    pd.DataFrame({"videoId": list(crawled_videos | set(crawled_list))}).to_csv(
-        CRAWLED_VIDEOS_FILE, index=False, encoding="utf-8-sig"
-    )
-
-print("🎉 Crawl xong! Kết quả đã lưu trong comments.csv")
+print(f"\n✅ Crawl xong! Đã lưu {len(df)} comments vào file comments.csv")
