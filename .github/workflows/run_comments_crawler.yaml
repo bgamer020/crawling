@@ -20,7 +20,7 @@ jobs:
 
     - name: ✅ Install dependencies
       run: |
-        pip install pandas google-api-python-client
+        pip install pandas google-api-python-client tqdm  
 
     - name: ✅ Tạo thư mục lưu file theo ngày
       run: |
