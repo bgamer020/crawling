@@ -1,9 +1,9 @@
 name: Crawl Trending Comments
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:     # cho phép chạy thủ công
   schedule:
-    - cron: "0 0,6,12,18 * * *"   # chạy 4 lần/ngày
+    - cron: "0 0,6,12,18 * * *"   # chạy 4 lần/ngày (UTC, tương đương 7h, 13h, 19h, 1h VN)
 
 jobs:
   crawl:
@@ -22,20 +22,20 @@ jobs:
       run: |
         pip install pandas google-api-python-client tqdm  
 
-    - name: ✅ Tạo thư mục lưu file theo ngày
+    - name: ✅ Chạy file crawl (lưu tại root, append dữ liệu)
       run: |
-        TODAY=$(date +'%Y-%m-%d')
-        echo "FOLDER=crawled/$TODAY" >> $GITHUB_ENV
-        mkdir -p crawled/$TODAY
-
-    - name: ✅ Chạy file crawl (API key đã nằm trong code Python)
-      env:
-        SAVE_PATH: ${{ env.FOLDER }}/comments.csv
-      run: |
-        python crawl_comments.py "$SAVE_PATH"
+        python crawl_comments.py
 
     - name: ✅ Upload artifact để tải về
       uses: actions/upload-artifact@v4
       with:
-        name: comments_${{ env.FOLDER }}
-        path: ${{ env.FOLDER }}
+        name: comments
+        path: comments.csv
+
+    - name: ✅ Commit và push file comments.csv lên repo
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add comments.csv
+        git commit -m "Update comments.csv (append data) [skip ci]" || echo "No changes to commit"
+        git push
