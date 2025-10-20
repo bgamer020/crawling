@@ -22,13 +22,13 @@ jobs:
       run: |
         pip install pandas google-api-python-client
 
-    - name: ✅ Tạo thư mục lưu file theo ngày (VD: crawled/2025-10-20)
+    - name: ✅ Tạo thư mục lưu file theo ngày
       run: |
         TODAY=$(date +'%Y-%m-%d')
         echo "FOLDER=crawled/$TODAY" >> $GITHUB_ENV
         mkdir -p crawled/$TODAY
 
-    - name: ✅ Chạy file crawl (API key đã nằm trong code Python rồi)
+    - name: ✅ Chạy file crawl (API key đã nằm trong code Python)
       env:
         SAVE_PATH: ${{ env.FOLDER }}/comments.csv
       run: |
