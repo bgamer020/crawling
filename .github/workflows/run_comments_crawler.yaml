@@ -1,50 +1,43 @@
-name: Comment Crawler
+name: Crawl Trending Comments
 
 on:
-  schedule:
-    - cron: "0 18 * * *"   # chạy lúc 1h sáng giờ VN (UTC+7)
   workflow_dispatch:
+  schedule:
+    - cron: "0 0,6,12,18 * * *"   # Chạy mỗi ngày 4 lần: 00h, 06h, 12h, 18h UTC
 
 jobs:
   crawl:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4   # cũng nên nâng lên v4
+    - name: ✅ Checkout source code
+      uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
+    - name: ✅ Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
 
-      - name: Install dependencies
-        run: |
-          pip install pandas google-api-python-client
+    - name: ✅ Install dependencies
+      run: |
+        pip install pandas google-api-python-client
 
-      - name: Run crawler
-        run: |
-          python crawl_comments.py
+    - name: ✅ Tạo thư mục lưu file theo ngày (VD: crawled/2025-10-20)
+      id: setfolder
+      run: |
+        TODAY=$(date +'%Y-%m-%d')
+        echo "FOLDER=crawled/$TODAY" >> $GITHUB_ENV
+        mkdir -p "crawled/$TODAY"
 
-      # === Upload artifacts (v4 mới) ===
-      - name: Upload comments.csv
-        uses: actions/upload-artifact@v4
-        with:
-          name: comments
-          path: comments.csv
+    - name: ✅ Chạy file crawl và lưu kết quả
+      env:
+        SAVE_PATH: ${{ env.FOLDER }}/comments.csv
+      run: |
+        python crawl_comments.py "$SAVE_PATH"
 
-      - name: Upload crawled_videos.csv
-        uses: actions/upload-artifact@v4
-        with:
-          name: crawled_videos
-          path: crawled_videos.csv
-
-      # === Commit & Push file mới vào repo ===
-      - name: Commit and Push results
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add comments.csv crawled_videos.csv
-          git commit -m "Update crawled data [skip ci]" || echo "No changes to commit"
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/bgamer020/crawling.git HEAD:main
-
+    - name: ✅ Upload artifact để tải về
+      uses: actions/upload-artifact@v4
+      with:
+        # Artifact không được có dấu "/" trong tên, nên thay bằng dấu gạch dưới "_"
+        name: comments_${{ env.FOLDER//\//_ }}
+        path: ${{ env.FOLDER }}
