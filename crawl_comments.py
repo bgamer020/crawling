@@ -8,9 +8,6 @@ from datetime import datetime
 # 🔑 API key
 API_KEY = "AIzaSyB1AJ862OVBHBDIZSASiEgCHzHo1_ramiE"
 
-# ⚙️ File output cố định
-OUTPUT_FILE = "comments.csv"
-
 # ⚙️ Khởi tạo YouTube API
 youtube = build("youtube", "v3", developerKey=API_KEY)
 
@@ -28,7 +25,9 @@ def get_trending_videos(max_results=50, region="VN"):
         videos.append({
             "videoId": item["id"],
             "title": item["snippet"]["title"],
-            "category": item["snippet"]["categoryId"]
+            "category": item["snippet"]["categoryId"],
+            "channel": item["snippet"]["channelTitle"],
+            "publishTime": item["snippet"]["publishedAt"]
         })
     return videos
 
@@ -75,10 +74,10 @@ for video in tqdm(videos, desc="📄 Crawling comments"):
 
 df = pd.DataFrame(all_comments)
 
-# 💾 Append vào file comments.csv (nếu đã có)
-if os.path.exists(OUTPUT_FILE):
-    df.to_csv(OUTPUT_FILE, mode="a", index=False, header=False, encoding="utf-8-sig")
-else:
-    df.to_csv(OUTPUT_FILE, index=False, encoding="utf-8-sig")
+# 💾 Ghi đè file mới với tên theo ngày giờ
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+OUTPUT_FILE = f"comments_{timestamp}.csv"
 
-print(f"\n✅ Crawl xong! Đã thêm {len(df)} comments vào {OUTPUT_FILE}")
+df.to_csv(OUTPUT_FILE, index=False, encoding="utf-8-sig")
+
+print(f"\n✅ Crawl xong! Đã lưu {len(df)} comments vào file: {OUTPUT_FILE}")
