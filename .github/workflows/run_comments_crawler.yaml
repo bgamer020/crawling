@@ -1,9 +1,9 @@
 name: Crawl Trending Comments
 
 on:
-  workflow_dispatch:     # cho phép chạy thủ công
+  workflow_dispatch:     # Cho phép chạy thủ công
   schedule:
-    - cron: "0 0,6,12,18 * * *"   # chạy 4 lần/ngày (UTC, tương đương 7h, 13h, 19h, 1h VN)
+    - cron: "0 0,6,12,18 * * *"   # Chạy 4 lần/ngày (UTC → 7h, 13h, 19h, 1h VN)
 
 jobs:
   crawl:
@@ -20,22 +20,32 @@ jobs:
 
     - name: ✅ Install dependencies
       run: |
-        pip install pandas google-api-python-client tqdm  
+        pip install pandas google-api-python-client tqdm
 
-    - name: ✅ Chạy file crawl (lưu tại root, append dữ liệu)
+    - name: 🕒 Lưu timestamp để dùng thống nhất
+      id: timestamp
+      run: echo "time=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
+
+    - name: ✅ Chạy script crawl (ghi đè và tạo file mới theo giờ)
       run: |
         python crawl_comments.py
 
-    - name: ✅ Upload artifact để tải về
+    - name: 🔍 Xác định file CSV vừa tạo
+      id: findfile
+      run: |
+        FILE=$(ls comments_*.csv | sort -r | head -n 1)
+        echo "file=$FILE" >> $GITHUB_OUTPUT
+
+    - name: 📦 Upload artifact (tên có ngày giờ)
       uses: actions/upload-artifact@v4
       with:
-        name: comments
-        path: comments.csv
+        name: comments_${{ steps.timestamp.outputs.time }}
+        path: ${{ steps.findfile.outputs.file }}
 
-    - name: ✅ Commit và push file comments.csv lên repo
+    - name: ✅ Commit và push file CSV mới lên repo
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        git add comments.csv
-        git commit -m "Update comments.csv (append data) [skip ci]" || echo "No changes to commit"
+        git add comments_*.csv
+        git commit -m "🕒 Add crawl data comments_${{ steps.timestamp.outputs.time }}.csv [skip ci]" || echo "No new file to commit"
         git push
