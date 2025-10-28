@@ -20,7 +20,8 @@ jobs:
 
     - name: ✅ Install dependencies
       run: |
-        pip install pandas google-api-python-client tqdm
+        pip install pandas google-api-python-client tqdm packaging
+
 
     - name: 🕒 Lưu timestamp để dùng thống nhất
       id: timestamp
