@@ -25,11 +25,11 @@ jobs:
 
     - name: 🕒 Lưu timestamp để dùng thống nhất
       id: timestamp
-      run: echo "time=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
+      #run: echo "time=$(date +'%Y%m%d_%H%M%S')" >> $GITHUB_OUTPUT
 
     - name: ✅ Chạy script crawl (ghi đè và tạo file mới theo giờ)
-      run: |
-        python crawl_comments.py
+      # run: |
+        # python crawl_comments.py
 
     - name: 🔍 Xác định file CSV vừa tạo
       id: findfile
