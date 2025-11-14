@@ -28,9 +28,9 @@ jobs:
         run: pip install google-api-python-client pandas isodate packaging
 
       - name: Run crawlers
-        run: |
-          python crawl_trending.py
-          python crawl_non_trending.py
+        #run: |
+        #  python crawl_trending.py
+        #  python crawl_non_trending.py
 
       - name: Commit CSV results
         run: |
